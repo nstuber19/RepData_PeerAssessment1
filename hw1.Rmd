@@ -1,0 +1,174 @@
+---
+title: "ReproducibleResearchHW1"
+author: "Nick Stuber"
+date: "November 21, 2016"
+output: html_document
+---
+
+
+```{r}
+## Load in raw data into dataframe
+rawData <- read.csv("activity.csv", 
+                      sep = ',', 
+                      header = TRUE,
+                      na.strings = "NA")
+```
+
+# Q: What is mean total number of steps taken per day?
+
+Removing rows with 'NA' values in the steps column
+```{r}
+updatedData <- rawData[!(is.na(rawData$steps)), ]
+```
+
+Sum of steps by the date
+```{r}
+stepsByDate <- aggregate(steps ~ date, updatedData, sum)
+```
+
+Create histogram of steps taken per day
+```{r, echo=TRUE}
+hist(stepsByDate$steps, 
+     main = "Histogram of total number of steps per day",
+     xlab = "Steps per day")
+```
+
+Calculating the mean of total number of steps taken per day
+```{r}
+mean(stepsByDate$steps)
+```
+
+Calculating the median of total number of steps taken per day
+```{r}
+median(stepsByDate$steps)
+```
+
+
+
+
+# Q: What is the average daily activity pattern?
+
+Sum of steps by the interval
+```{r}
+stepsByInterval <- aggregate(steps ~ interval, updatedData, mean)
+```
+
+Graphing time series of average steps taken (averaged across all days) by 5-minute intervals
+```{r, echo=TRUE}
+with(stepsByInterval, 
+     plot(interval, 
+          steps, 
+          type = "l", 
+          main = "Avg number of steps over 5-min intervals",
+          ylab = "Avg steps taken (averaged across all days)",
+          xlab = "5-minute Intervals"))
+```
+
+Identifying 5-minute interval where the most steps (on average) occur
+```{r}
+stepsByInterval[which(stepsByInterval$steps == max(stepsByInterval$steps)),]
+```
+
+
+
+
+# Imputing missing values
+Calculating the number of rows with NA values in the 'steps' column
+```{r}
+sum(is.na(rawData$steps))
+```
+
+Create a new dataset that is equal to the original dataset but with the missing data filled in.
+```{r}
+completeData <- rawData
+```
+
+Creating loop to fill in NA values with the average value of its specific interval value
+```{r}
+for (i in 1:nrow(completeData)) {
+    if (is.na(completeData[i, 1]) == TRUE) {
+        rowInterval <- completeData[i, 3]
+        dataSubset <- subset(completeData, interval == rowInterval)
+        completeData[i, 1] <- round(mean(dataSubset$steps, na.rm = TRUE))
+    }
+}
+```
+
+Summing steps by the dates
+```{r}
+stepsByDateComplete <- aggregate(steps ~ date, completeData, sum)
+```
+
+Create histogram of steps taken per day
+```{r, echo=TRUE}
+hist(stepsByDateComplete$steps, 
+     main = "Histogram of total number of steps per day",
+     xlab = "Steps per day")
+```
+
+
+
+
+# Are there differences in activity patterns between weekdays and weekends?
+Changing date column from 'factor' to 'date' (POSIXt)
+```{r}
+completeData$date <- strptime(completeData$date, format = "%Y-%m-%d")
+```
+
+Creating list of possible weekdays
+```{r}
+weekdaysList <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+```
+
+Adding column to dataset that will list if date is a weekday/weekend (initially setting value to NA)
+```{r}
+completeData$day <- NA
+```
+
+Creating loop to evaluate row date and add corresponding weekday/weekend value
+```{r}
+for (i in 1:nrow(completeData)) {
+    rowDate <- completeData[i, 2]
+    if (weekdays(rowDate) %in% weekdaysList) {
+        completeData[i, 4] <- "weekday"
+    } 
+    else {
+        completeData[i, 4] <- "weekend"
+    }
+}
+```
+
+Loading lattice package
+```{r}
+library(lattice)
+```
+
+Creating subsets of the complete data, weekday vs weekend
+```{r}
+weekdayData <- subset(completeData, day == "weekday")
+weekendData <- subset(completeData, day == "weekend")
+stepsByIntervalWeekday <- aggregate(steps ~ interval , weekdayData, mean)
+stepsByIntervalWeekday$day <- "weekday"
+stepsByIntervalWeekend <- aggregate(steps ~ interval , weekendData, mean)
+stepsByIntervalWeekend$day <- "weekend"
+```
+
+Combining weekend/weekday data back together
+```{r}
+stepsByIntervalDays <- rbind(stepsByIntervalWeekday, stepsByIntervalWeekend)
+```
+
+Plotting weekend and weekday data
+```{r, echo=TRUE}
+xyplot(steps ~ interval | day, 
+       data = stepsByIntervalDays, 
+       type = "l", 
+       ylab = "Number of Steps", 
+       xlab = "Interval", 
+       ylim = c(0, 250), 
+       layout = c(1, 2))
+```
+
+
+
+
